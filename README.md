@@ -38,4 +38,5 @@ Requiere crear un archivo `secrets.h` en `src` para cargar los datos de WiFI y F
 #define DATABASE_URL "Firebase RTDB url"
 #define AUTH_EMAIL "Firebase email"
 #define AUTH_PASSWORD "Firebase password"
+#define DEVICE_PATH "<device_name>/register"
 ```
