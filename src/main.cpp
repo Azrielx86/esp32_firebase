@@ -95,7 +95,7 @@ void loop()
 		Serial.println(humidity);
 		
 		FirebaseJson json;
-		json.set("fields/date/stringValue", time_str_buffer);
+		json.set("fields/date/timestampValue", time_str_buffer);
 		json.set("fields/temperature/doubleValue", temperature);
 		json.set("fields/humidity/doubleValue", humidity);
 		
@@ -125,7 +125,7 @@ void get_current_date(char *buffer, int size)
 
 	std::time(&rawtime);
 	timeinfo = std::localtime(&rawtime);
-	std::strftime(buffer, size, "%Y-%m-%d-%H-%M-%S", timeinfo);
+	std::strftime(buffer, size, "%Y-%m-%dT%H:%M:%SZ", timeinfo);
 }
 
 void firebase_login()
