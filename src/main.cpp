@@ -12,8 +12,8 @@
 
 // Configuracion del tiempo para CDMX
 #define NTP_SERVER "pool.ntp.org"
-#define GMT_OFFSET_SEC (-25200)
-#define DAYLIGHT_OFFSET_SEC (-25200)
+#define GMT_OFFSET_SEC (-21600)
+#define DAYLIGHT_OFFSET_SEC 0
 
 // Display settings
 #define SCREEN_WIDTH 128
@@ -58,6 +58,11 @@ void setup()
 		Serial.println("Canno't initialize display");
 	}
 
+	display.clearDisplay();
+	display.setTextColor(WHITE);
+	display.setTextSize(2);
+	display.setCursor(0, 0);
+	display.print("Starting!");
 	display.display();
 	delay(100);
 	display.clearDisplay();
@@ -119,7 +124,7 @@ void loop()
 		display.display();
 	}
 
-	if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 30000 || sendDataPrevMillis == 10000))
+	if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 60000 || sendDataPrevMillis == 10000))
 	{
 		sendDataPrevMillis = millis();
 		get_current_date(time_str_buffer, 80);
@@ -132,6 +137,10 @@ void loop()
 
 		Serial.println(temperature);
 		Serial.println(humidity);
+		
+		display.setCursor(0, 50);
+		display.print("Updating to Firebase!");
+		display.display();
 
 		FirebaseJson json;
 		json.set("fields/date/timestampValue", time_str_buffer);
@@ -152,6 +161,7 @@ void loop()
 		{
 			Serial.println("Failed to update content");
 			Serial.println(fbdo.errorReason());
+			firebase_login();
 		}
 		count++;
 	}
@@ -176,6 +186,6 @@ void firebase_login()
 	}
 	else
 	{
-		Serial.printf("Cannot connect to Firebase: %s\n", config.signer.signupError);
+		Serial.printf("Cannot connect to Firebase: %s\n", config.signer.signupError.message.c_str());
 	}
 }
