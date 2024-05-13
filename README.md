@@ -4,22 +4,15 @@ Los datos se guardan como:
 
 ```json
 {
-  "esp32_edgar": {
-    "register": {
-      "-Nx_anwvHXt2qImi7ewX": {
-        "date": "2024-05-10-13-03-43",
-        "temp": {
-          "type": "Celsius",
-          "value": 30
-        }
-      },
-      "-Nx_arWFVCL87hb5y0Di": {
-        "date": "2024-05-10-13-03-58",
-        "temp": {
-          "type": "Celsius",
-          "value": 30
-        }
-      }
+  "fields": {
+    "date": {
+      "timestampValue": "2024-05-12T12:01:38Z"
+    },
+    "temperature": {
+      "doubleValue": 34
+    },
+    "humidity": {
+      "doubleValue": 28
     }
   }
 }
@@ -38,5 +31,23 @@ Requiere crear un archivo `secrets.h` en `src` para cargar los datos de WiFI y F
 #define DATABASE_URL "Firebase RTDB url"
 #define AUTH_EMAIL "Firebase email"
 #define AUTH_PASSWORD "Firebase password"
-#define DEVICE_PATH "<device_name>/register"
+#define DEVICE_PATH "devices/<device_name>"
 ```
+
+En Firebase, se debe crear un documento en `devices` con los siguientes datos
+
+```
+device_name: "Device name"
+location: "Device location"
+type: "Device type"
+```
+
+## Conexiones en la ESP32
+
+| Pin | Uso             |
+|-----|-----------------|
+| 4   | DATA IN - DHT11 |
+| 21  | SCL Display     |
+| 22  | SDA Display     |
+
+[Pinout diagram](https://www.circuitstate.com/pinouts/doit-esp32-devkit-v1-wifi-development-board-pinout-diagram-and-reference/)
