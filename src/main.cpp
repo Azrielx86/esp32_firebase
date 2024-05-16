@@ -30,9 +30,15 @@ FirebaseAuth auth;
 FirebaseConfig config;
 
 unsigned long sendDataPrevMillis = 0;
+unsigned long readDataPrevMillis = 0;
 unsigned long displayUpdateTime = 0;
 int count = 0;
 bool signupOK = false;
+
+float temperature = 0.0f;
+float humidity = 0.0f;
+bool start_fan = false;
+bool start_humidifier = false;
 
 char time_str_buffer[80];
 
@@ -69,9 +75,19 @@ void setup()
 
 	Serial.printf("Connecting to %s", wifi_ssid);
 	bool intermitent = false;
+	const char spin[4] = {'-', '\\', '|', '/'};
+	int char_count = 0;
 	while (WiFi.status() != WL_CONNECTED)
 	{
 		Serial.print(".");
+		display.clearDisplay();
+		display.setTextColor(WHITE);
+		display.setTextSize(2);
+		display.setCursor(0, 0);
+		display.print("Connecting     ");
+		display.print(spin[char_count++ <= 3 ? char_count : (char_count = 0)]);
+		display.display();
+
 		digitalWrite(LED_BUILTIN, (intermitent = !intermitent) ? HIGH : LOW);
 		delay(100);
 	}
@@ -101,14 +117,16 @@ void setup()
 
 void loop()
 {
-	float temperature = dht.readTemperature();
-	float humidity = dht.readHumidity();
+	temperature = dht.readTemperature();
+	humidity = dht.readHumidity();
+	start_fan = false;
+	start_humidifier = false;
 
 	if (millis() - displayUpdateTime > 1000 || displayUpdateTime == 0)
 	{
 		displayUpdateTime = millis();
 		get_current_date(time_str_buffer, 80);
-		
+
 		display.clearDisplay();
 		display.setTextSize(1);
 		display.setTextColor(WHITE);
@@ -119,9 +137,22 @@ void loop()
 		display.setCursor(0, 20);
 		display.printf("Humidity: %.2f", humidity);
 		display.setCursor(0, 30);
+		display.printf("Fan: %s", (start_fan ? "on" : "off"));
+		display.setCursor(0, 40);
+		display.printf("Humidifier: %s", (start_humidifier ? "on" : "off"));
+		display.setCursor(0, 50);
 		display.print("IP: ");
 		display.print(WiFi.localIP());
 		display.display();
+	}
+
+	if (Firebase.ready() && signupOK && (millis() - readDataPrevMillis > 60000) || readDataPrevMillis == 12000)
+	{
+		String measuresPath;
+		measuresPath.concat(device_path);
+		measuresPath.concat("/triggers");
+		readDataPrevMillis = millis();
+		start_fan = Firebase.RTDB.getBool(&fbdo, measuresPath + "/start_fan");
 	}
 
 	if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 60000 || sendDataPrevMillis == 10000))
@@ -137,8 +168,8 @@ void loop()
 
 		Serial.println(temperature);
 		Serial.println(humidity);
-		
-		display.setCursor(0, 50);
+
+		display.setCursor(0, 60);
 		display.print("Updating to Firebase!");
 		display.display();
 
