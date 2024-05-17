@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <DHT.h>
 #include <Firebase_ESP_Client.h>
+#include <IRremote.hpp>
 #include <SPI.h>
 #include <WiFi.h>
 #include <Wire.h>
@@ -21,6 +22,12 @@
 
 // Configuración del sensor de temperatura y humedad
 #define DHTPIN 4
+
+enum ActionsState
+{
+	AST_ON,
+	AST_OFF
+};
 
 const char *wifi_ssid = WIFI_SSID;
 const char *wifi_pwd = WIFI_PWD;
@@ -42,8 +49,30 @@ bool start_humidifier = false;
 
 char time_str_buffer[80];
 
+// fan stuff
+// clang-format off
+uint16_t rawData[48] = {
+	8300,
+	1300, 400,
+	1250, 400,  450, 1250, 1250, 400,  1300, 400,
+	450,  1200, 450, 1250, 450,  1250, 500,  1150,
+	450,  1250, 450, 1250, 1250, 7150, 1350, 300,
+	1350, 350,  450, 1250, 1300, 350,  1300, 400,
+	500,  1150, 500, 1200, 500,  1150, 450,  1250,
+	450,  1250, 450, 1200, 1400,
+};
+// clang-format on
+ActionsState fan_state = ActionsState::AST_OFF;
+ActionsState prev_fan_state = ActionsState::AST_OFF;
+ActionsState humidifier_state = ActionsState::AST_OFF;
+ActionsState prev_humidifier_state = ActionsState::AST_OFF;
+
 // Path of the device on Firebase
 const char *device_path = DEVICE_PATH;
+
+// Botón pruebas
+int getButtonCurrentState, getButtonLastState;
+int updateButtonCurrentState, updateButtonLastState;
 
 void get_current_date(char *buffer, int size);
 
@@ -58,6 +87,8 @@ void setup()
 	Serial.begin(115200);
 	WiFi.begin(wifi_ssid, wifi_pwd);
 	pinMode(LED_BUILTIN, OUTPUT);
+	pinMode(GPIO_NUM_13, INPUT_PULLUP);
+	pinMode(GPIO_NUM_14, INPUT_PULLUP);
 
 	if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
 	{
@@ -113,14 +144,44 @@ void setup()
 
 	Firebase.begin(&config, &auth);
 	Firebase.reconnectWiFi(true);
+
+	IrReceiver.begin(GPIO_NUM_25, DISABLE_LED_FEEDBACK);
+	IrSender.begin(GPIO_NUM_26);
+	pinMode(GPIO_NUM_27, OUTPUT);
 }
 
 void loop()
 {
 	temperature = dht.readTemperature();
 	humidity = dht.readHumidity();
-	start_fan = false;
-	start_humidifier = false;
+
+	// region test buttons
+	bool readNow = false;
+	bool upNow = false;
+	getButtonCurrentState = digitalRead(GPIO_NUM_13);
+	if (getButtonCurrentState == LOW && getButtonLastState == HIGH)
+	{
+		Serial.println("[Prueba de lectura] Forzando leer datos.");
+		display.clearDisplay();
+		display.setCursor(0, 0);
+		display.println("[Prueba de lectura] Forzando leer datos.");
+		display.display();
+		readNow = true;
+	}
+	getButtonLastState = getButtonCurrentState;
+
+	updateButtonCurrentState = digitalRead(GPIO_NUM_14);
+	if (updateButtonCurrentState == LOW && updateButtonLastState == HIGH)
+	{
+		Serial.println("[Prueba de escritura] Forzando subir datos.");
+		display.clearDisplay();
+		display.setCursor(0, 0);
+		display.println("[Prueba de escritura] Forzando subir datos.");
+		display.display();
+		upNow = true;
+	}
+	updateButtonLastState = updateButtonCurrentState;
+	// endregion
 
 	if (millis() - displayUpdateTime > 1000 || displayUpdateTime == 0)
 	{
@@ -146,16 +207,29 @@ void loop()
 		display.display();
 	}
 
-	if (Firebase.ready() && signupOK && (millis() - readDataPrevMillis > 60000) || readDataPrevMillis == 12000)
+	if (Firebase.ready() && signupOK && (millis() - readDataPrevMillis > 60000) || readDataPrevMillis == 12000 || readNow)
 	{
+		readDataPrevMillis = millis();
 		String measuresPath;
+		measuresPath.concat("/");
 		measuresPath.concat(device_path);
 		measuresPath.concat("/triggers");
-		readDataPrevMillis = millis();
-		start_fan = Firebase.RTDB.getBool(&fbdo, measuresPath + "/start_fan");
+		Serial.printf("Getting temperature trigger from %s\n", (measuresPath + "/start_fan").c_str());
+		Firebase.RTDB.getBool(&fbdo, (measuresPath + "/start_fan").c_str());
+		Serial.println(fbdo.dataPath());
+		if (!(fbdo.dataType() == "bool"))
+			Serial.println(fbdo.errorReason());
+		start_fan = fbdo.boolData();
+
+		Serial.printf("Getting humidity trigger from %s\n", (measuresPath + "/start_fan").c_str());
+		Firebase.RTDB.getBool(&fbdo, (measuresPath + "/start_humidifier").c_str());
+		Serial.println(fbdo.dataPath());
+		if (!(fbdo.dataType() == "bool"))
+			Serial.println(fbdo.errorReason());
+		start_humidifier = fbdo.boolData();
 	}
 
-	if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 60000 || sendDataPrevMillis == 10000))
+	if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 60000 || sendDataPrevMillis == 10000) || upNow)
 	{
 		sendDataPrevMillis = millis();
 		get_current_date(time_str_buffer, 80);
@@ -195,6 +269,41 @@ void loop()
 			firebase_login();
 		}
 		count++;
+	}
+
+	// Control de actuadores
+	if (fan_state == ActionsState::AST_OFF && start_fan)
+	{
+		fan_state = ActionsState::AST_ON;
+		// enciende el ventilador
+		for (int i = 0; i < 10; ++i)
+		{
+			IrSender.sendRaw(rawData, 48, 38);
+			delay(10);
+		}
+	}
+
+	if (fan_state == ActionsState::AST_ON && !start_fan)
+	{
+		fan_state = ActionsState::AST_OFF;
+		// Para apagarlo
+		for (int i = 0; i < 10; ++i)
+		{
+			IrSender.sendRaw(rawData, 48, 38);
+			delay(10);
+		}
+	}
+
+	if (humidifier_state == ActionsState::AST_OFF && start_humidifier)
+	{
+		humidifier_state = ActionsState::AST_ON;
+		digitalWrite(GPIO_NUM_27, HIGH);
+	}
+
+	if (humidifier_state == ActionsState::AST_ON && !start_humidifier)
+	{
+		humidifier_state = ActionsState::AST_OFF;
+		digitalWrite(GPIO_NUM_27, LOW);
 	}
 }
 
