@@ -148,6 +148,8 @@ void setup()
 	IrReceiver.begin(GPIO_NUM_25, DISABLE_LED_FEEDBACK);
 	IrSender.begin(GPIO_NUM_26);
 	pinMode(GPIO_NUM_27, OUTPUT);
+	
+	digitalWrite(GPIO_NUM_27, LOW);
 }
 
 void loop()
@@ -297,13 +299,13 @@ void loop()
 	if (humidifier_state == ActionsState::AST_OFF && start_humidifier)
 	{
 		humidifier_state = ActionsState::AST_ON;
-		digitalWrite(GPIO_NUM_27, HIGH);
+		digitalWrite(GPIO_NUM_27, LOW);
 	}
 
 	if (humidifier_state == ActionsState::AST_ON && !start_humidifier)
 	{
 		humidifier_state = ActionsState::AST_OFF;
-		digitalWrite(GPIO_NUM_27, LOW);
+		digitalWrite(GPIO_NUM_27, HIGH);
 	}
 }
 
