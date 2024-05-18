@@ -144,7 +144,7 @@ void setup()
 	Firebase.reconnectWiFi(true);
 
 	IrReceiver.begin(GPIO_NUM_25, DISABLE_LED_FEEDBACK);
-	IrSender.begin(GPIO_NUM_26);
+	IrSender.begin(GPIO_NUM_26, true, GPIO_NUM_33);
 	pinMode(GPIO_NUM_27, OUTPUT);
 	
 	digitalWrite(GPIO_NUM_27, HIGH);
