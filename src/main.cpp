@@ -63,9 +63,7 @@ uint16_t rawData[48] = {
 };
 // clang-format on
 ActionsState fan_state = ActionsState::AST_OFF;
-ActionsState prev_fan_state = ActionsState::AST_OFF;
 ActionsState humidifier_state = ActionsState::AST_OFF;
-ActionsState prev_humidifier_state = ActionsState::AST_OFF;
 
 // Path of the device on Firebase
 const char *device_path = DEVICE_PATH;
@@ -149,7 +147,7 @@ void setup()
 	IrSender.begin(GPIO_NUM_26);
 	pinMode(GPIO_NUM_27, OUTPUT);
 	
-	digitalWrite(GPIO_NUM_27, LOW);
+	digitalWrite(GPIO_NUM_27, HIGH);
 }
 
 void loop()
@@ -244,6 +242,7 @@ void loop()
 
 		Serial.println(temperature);
 		Serial.println(humidity);
+		Serial.println(time_str_buffer);
 
 		display.setCursor(0, 60);
 		display.print("Updating to Firebase!");
@@ -315,7 +314,7 @@ void get_current_date(char *buffer, int size)
 	std::tm *timeinfo;
 
 	std::time(&rawtime);
-	timeinfo = std::localtime(&rawtime);
+	timeinfo = std::gmtime(&rawtime);
 	std::strftime(buffer, size, "%Y-%m-%dT%H:%M:%SZ", timeinfo);
 }
 
